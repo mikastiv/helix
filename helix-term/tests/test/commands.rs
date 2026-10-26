@@ -9,6 +9,368 @@ mod rotate_selection_contents;
 mod write;
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_move_selection_single_selection_up() -> anyhow::Result<()> {
+    test((
+        indoc! {"
+            aaaaaa
+            bbbbbb
+            cc#[|c]#ccc
+            dddddd
+            "},
+        "<A-k>",
+        indoc! {"
+            aaaaaa
+            cc#[|c]#ccc
+            bbbbbb
+            dddddd
+            "},
+    ))
+    .await?;
+    Ok(())
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_selection_single_selection_down() -> anyhow::Result<()> {
+    test((
+        indoc! {"
+            aa#[|a]#aaa
+            bbbbbb
+            cccccc
+            dddddd
+            "},
+        "<A-j>",
+        indoc! {"
+            bbbbbb
+            aa#[|a]#aaa
+            cccccc
+            dddddd
+            "},
+    ))
+    .await?;
+    Ok(())
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_selection_single_selection_top_up() -> anyhow::Result<()> {
+    // if already on top of the file and going up, nothing should change
+    test((
+        indoc! {"
+            aa#[|a]#aaa
+            bbbbbb
+            cccccc
+            dddddd"},
+        "<A-k>",
+        indoc! {"
+            aa#[|a]#aaa
+            bbbbbb
+            cccccc
+            dddddd"},
+    ))
+    .await?;
+    Ok(())
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_selection_block_up() -> anyhow::Result<()> {
+    test((
+        indoc! {"
+            aaaaaa
+            bb#[bbbb
+            ccc|]#ccc
+            dddddd
+            eeeeee
+            "},
+        "<A-k>",
+        indoc! {"
+            bb#[bbbb
+            ccc|]#ccc
+            aaaaaa
+            dddddd
+            eeeeee
+            "},
+    ))
+    .await?;
+    Ok(())
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_selection_block_down() -> anyhow::Result<()> {
+    test((
+        indoc! {"
+            #[|aaaaaa
+            bbbbbb
+            ccc]#ccc
+            dddddd
+            eeeeee
+            "},
+        "<A-j>",
+        indoc! {"
+            dddddd
+            #[|aaaaaa
+            bbbbbb
+            ccc]#ccc
+            eeeeee
+            "},
+    ))
+    .await?;
+    Ok(())
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_two_cursors_down() -> anyhow::Result<()> {
+    test((
+        indoc! {"
+            aaaaaa
+            bb#[|b]#bbb
+            cccccc
+            d#(dd|)#ddd
+            eeeeee
+            "},
+        "<A-j>",
+        indoc! {"
+            aaaaaa
+            cccccc
+            bb#[|b]#bbb
+            eeeeee
+            d#(dd|)#ddd
+            "},
+    ))
+    .await?;
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_selection_single_selection_bottom_down() -> anyhow::Result<()> {
+    test((
+        "aaaaaa\nbbbbbb\ncccccc\ndd#[|d]#ddd\n",
+        "<A-j><A-j>",
+        "aaaaaa\nbbbbbb\ncccccc\ndd#[|d]#ddd\n",
+    ))
+    .await?;
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_split_selected_lines_up() -> anyhow::Result<()> {
+    // Select three lines with x, then split them into individual selections with Alt-s.
+    test((
+        indoc! {"\
+            zero
+            #[a|]#
+            bb
+            ccc
+            last
+            "},
+        "xxx<A-s><A-k>",
+        indoc! {"\
+            #[a|]#
+            #(bb|)#
+            #(ccc|)#
+            zero
+            last
+            "},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_split_selected_lines_down() -> anyhow::Result<()> {
+    // Select three lines with x, then split them into individual selections with Alt-s.
+    test((
+        indoc! {"\
+            zero
+            #[a|]#
+            bb
+            ccc
+            last
+            "},
+        "xxx<A-s><A-j>",
+        indoc! {"\
+            zero
+            last
+            #[a|]#
+            #(bb|)#
+            #(ccc|)#
+            "},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_adjacent_selections_up() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            zero
+            #(a|)#
+            #[bb|]#
+            #(ccc|)#
+            last"},
+        "<A-k>",
+        indoc! {"\
+            #(a|)#
+            #[bb|]#
+            #(ccc|)#
+            zero
+            last"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_adjacent_selections_down() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            zero
+            #(a|)#
+            #[bb|]#
+            #(ccc|)#
+            last"},
+        "<A-j>",
+        indoc! {"\
+            zero
+            last
+            #(a|)#
+            #[bb|]#
+            #(ccc|)#"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_separate_blocks_up() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            zero
+            #[a|]#
+            middle
+            #(bb|)#
+            last"},
+        "<A-k>",
+        indoc! {"\
+            #[a|]#
+            zero
+            #(bb|)#
+            middle
+            last"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_separate_blocks_down() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            zero
+            #[a|]#
+            middle
+            #(bb|)#
+            last"},
+        "<A-j>",
+        indoc! {"\
+            zero
+            middle
+            #[a|]#
+            last
+            #(bb|)#"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_up_with_selection_at_top() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            #[a|]#
+            middle
+            #(bb|)#"},
+        "<A-k>",
+        indoc! {"\
+            #[a|]#
+            #(bb|)#
+            middle"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_down_with_selection_at_bottom() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            #[a|]#
+            middle
+            #(bb|)#"},
+        "<A-j>",
+        indoc! {"\
+            middle
+            #[a|]#
+            #(bb|)#"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_selections_on_same_line() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            zero
+            #[|a]#b#(c|)#
+            last"},
+        "<A-k>",
+        indoc! {"\
+            #[|a]#b#(c|)#
+            zero
+            last"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_multiline_selection_down() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            zero
+            #[a
+            bb|]#
+            last"},
+        "<A-j>",
+        indoc! {"\
+            zero
+            last
+            #[a
+            bb|]#"},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_move_lines_unicode_and_crlf() -> anyhow::Result<()> {
+    // Keep explicit escapes here to verify CRLF line endings.
+    test((
+        "zero\r\n#[é|]#\r\n#(文|)#\r\nlast",
+        "<A-j>",
+        "zero\r\nlast\r\n#[é|]#\r\n#(文|)#",
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn search_selection_detect_word_boundaries_at_eof() -> anyhow::Result<()> {
     // <https://github.com/helix-editor/helix/issues/12609>
     test((

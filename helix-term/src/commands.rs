@@ -431,6 +431,8 @@ impl MappableCommand {
         goto_declaration, "Goto declaration",
         add_newline_above, "Add newline above",
         add_newline_below, "Add newline below",
+        move_lines_up, "Move selected lines up",
+        move_lines_down, "Move selected lines down",
         goto_type_definition, "Goto type definition",
         goto_implementation, "Goto implementation",
         goto_file_start, "Goto line number `<n>` else file start",
@@ -6809,6 +6811,84 @@ fn add_newline_impl(cx: &mut Context, open: Open) {
 
     let transaction = Transaction::change(text, changes);
     doc.apply(&transaction, view.id);
+}
+
+enum MoveSelection {
+    Up,
+    Down,
+}
+
+/// Move each contiguous block of selected lines, preserving its individual selections.
+fn move_selection(cx: &mut Context, direction: MoveSelection) {
+    let (view, doc) = current!(cx.editor);
+    let selection = doc.selection(view.id);
+    let text = doc.text();
+    let slice = text.slice(..);
+    let mut ranges = selection.iter().copied().collect::<Vec<_>>();
+    let mut changes = Vec::new();
+
+    for (start, end) in selection.line_ranges(slice) {
+        // Swap two blocks, ordered from top to bottom. Line numbers are inclusive.
+        // Either line above with selection or selection with line below.
+        let prev_line = start.saturating_sub(1);
+        let next_line = end + 1;
+        let (first_block_start, first_block_end, second_block_start, second_block_end) =
+            match direction {
+                // Must have a line above
+                MoveSelection::Up if start > 0 => (prev_line, prev_line, start, end),
+                // Must have a line below and not an empty trailing line
+                MoveSelection::Down
+                    if next_line < text.len_lines()
+                        && text.line_to_char(next_line) < text.len_chars() =>
+                {
+                    (start, end, next_line, next_line)
+                }
+                _ => continue,
+            };
+        let first_block_start = text.line_to_char(first_block_start);
+        let first_block_end = line_end_char_index(&slice, first_block_end);
+        let second_block_start = text.line_to_char(second_block_start);
+        let second_block_end = line_end_char_index(&slice, second_block_end);
+
+        // Preserve the separator between the blocks, including its line ending.
+        let mut replacement = Tendril::new();
+        replacement.push_str(&text.slice(second_block_start..second_block_end).to_string());
+        replacement.push_str(&text.slice(first_block_end..second_block_start).to_string());
+        replacement.push_str(&text.slice(first_block_start..first_block_end).to_string());
+        changes.push((first_block_start, second_block_end, Some(replacement)));
+
+        let (old_start, new_start) = match direction {
+            MoveSelection::Up => (second_block_start, first_block_start),
+            MoveSelection::Down => (
+                first_block_start,
+                first_block_start + second_block_end - first_block_end,
+            ),
+        };
+        for range in &mut ranges {
+            let (range_start, _) = range.line_range(slice);
+            if range_start > end {
+                break;
+            }
+            if range_start >= start {
+                *range = Range::new(
+                    range.anchor + new_start - old_start,
+                    range.head + new_start - old_start,
+                );
+            }
+        }
+    }
+
+    let new_selection = Selection::new(ranges.into(), selection.primary_index());
+    let transaction = Transaction::change(text, changes.into_iter()).with_selection(new_selection);
+    doc.apply(&transaction, view.id);
+}
+
+fn move_lines_up(cx: &mut Context) {
+    move_selection(cx, MoveSelection::Up)
+}
+
+fn move_lines_down(cx: &mut Context) {
+    move_selection(cx, MoveSelection::Down)
 }
 
 enum IncrementDirection {
