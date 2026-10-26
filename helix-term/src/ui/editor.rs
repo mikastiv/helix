@@ -1594,6 +1594,9 @@ impl Component for EditorView {
             Event::Mouse(event) => self.handle_mouse_event(event, &mut cx),
             Event::IdleTimeout => self.handle_idle_timeout(&mut cx),
             Event::FocusGained => {
+                if context.editor.config().auto_reload {
+                    commands::typed::auto_reload(context);
+                }
                 self.terminal_focused = true;
                 EventResult::Consumed(None)
             }

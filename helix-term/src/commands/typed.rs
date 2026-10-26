@@ -1611,12 +1611,38 @@ fn reload_all(cx: &mut compositor::Context, _args: Args, event: PromptEvent) -> 
         return Ok(());
     }
 
+    reload_documents(cx, |_| true);
+    Ok(())
+}
+
+/// Reload externally changed buffers without discarding unsaved edits.
+pub(crate) fn auto_reload(cx: &mut compositor::Context) {
+    let modified_names: Vec<_> = cx
+        .editor
+        .documents()
+        .filter(|doc| doc.is_modified() && doc.is_modified_on_disk())
+        .map(|doc| doc.display_name().into_owned())
+        .collect();
+
+    if !modified_names.is_empty() {
+        cx.editor.set_warning(format!(
+            "File{} \"{}\" changed on disk and in Helix as well. Use :reload to discard buffer changes.",
+            if modified_names.len() > 1 { "s" } else { "" },
+            modified_names.join(", ")
+        ));
+    }
+
+    reload_documents(cx, |doc| !doc.is_modified() && doc.is_modified_on_disk());
+}
+
+fn reload_documents(cx: &mut compositor::Context, should_reload: impl Fn(&Document) -> bool) {
     let scrolloff = cx.editor.config().scrolloff;
     let view_id = view!(cx.editor).id;
 
     let docs_view_ids: Vec<(DocumentId, Vec<ViewId>)> = cx
         .editor
         .documents_mut()
+        .filter(|doc| should_reload(doc))
         .map(|doc| {
             let mut view_ids: Vec<_> = doc.selections().keys().cloned().collect();
 
@@ -1673,8 +1699,6 @@ fn reload_all(cx: &mut compositor::Context, _args: Args, event: PromptEvent) -> 
             }
         }
     }
-
-    Ok(())
 }
 
 /// Update the [`Document`] if it has been modified.

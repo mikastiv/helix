@@ -44,6 +44,7 @@
 | `auto-completion` | Enable automatic pop up of auto-completion | `true` |
 | `path-completion` | Enable filepath completion. Show files and directories if an existing path at the cursor was recognized, either absolute or relative to the current opened document or current working directory (if the buffer is not yet saved). Defaults to true. | `true` |
 | `auto-format` | Enable automatic formatting on save[^3] | `true` |
+| `auto-reload` | Reload buffers whose files changed on disk when the terminal gains focus. Buffers with unsaved edits are kept and a warning is shown. | `true` |
 | `idle-timeout` | Time in milliseconds since last keypress before idle timers trigger. | `250` |
 | `completion-timeout` | Time in milliseconds after typing a word character before completions are shown, set to 5 for instant.  | `250` |
 | `preview-completion-insert` | Whether to apply completion item instantly when selected | `true` |
