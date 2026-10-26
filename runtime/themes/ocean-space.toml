@@ -3,7 +3,7 @@
 "attribute" = "red"
 "type" = "orange"
 "type.builtin" = "purple"
-"type.enum" = "purple"
+"type.enum" = "red"
 "constructor" = "yellow"
 "constant" = "red"
 "string" = "green"
